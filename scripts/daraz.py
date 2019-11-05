@@ -1,16 +1,18 @@
 import requests
 import re
+import os
 import json
 import ConfigParser
 import logging
 from twisted.protocols.ftp import FileNotFoundError
-
+from datetime import datetime
+from elasticsearch import Elasticsearch
 
 url_root = ""
 output_path = ""
 page_limit = None
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, filename="daraz.log")
 
 
 def read_config():
@@ -25,7 +27,7 @@ def read_config():
     logging.info("URL_ROOT: {0} , OUTPUT_PATH: {1}, PAGE_LIMIT: {2}".format(url_root, output_path, page_limit))
 
 
-def scrape_category(category):
+def scrape_category(category, output_path_suffix = None):
     url_suffix = "/{0}".format(category)
     url_query_param = ""
 
@@ -33,6 +35,11 @@ def scrape_category(category):
     pagesize = None
     total_pages = None
     product_list = []
+    es = Elasticsearch()
+    try:
+        es.indices.create(index='product')
+    except Exception, e:
+        logging.error("ElasticSearch Exception occured: {0}".format(str(e)))
 
     while (page is None and pagesize is None) or (page is not None and pagesize is not None and page < total_pages and page < page_limit):
         url = url_root + url_suffix + url_query_param
@@ -54,8 +61,11 @@ def scrape_category(category):
                 description = description + "\n" + line
             product["description"] = description
             product["brand"] = item["brandName"]
+            categories = output_path_suffix.split('/')
+            product["categories"] = categories
             product_list.append(product)
             logging.info("Product URL: {0}".format(product["url"]))
+            es.index('product', product)
 
         pagesize = int(datajson["mainInfo"]["pageSize"])
         page = int(datajson["mainInfo"]["page"])
@@ -65,7 +75,14 @@ def scrape_category(category):
 
         url_query_param = "?page=" + str(page+1)
 
-    file_path = "{0}{1}.json".format(output_path, category)
+    file_path = ''
+    if output_path_suffix is None:
+        file_path = "{0}{1}.json".format(output_path, category)
+    else:
+        file_path = "{0}{1}/{2}.json".format(output_path, output_path_suffix, category)
+        # os.mkdir("{0}{1}".format(output_path, output_path_suffix), 0666)
+        os.makedirs("{0}{1}".format(output_path, output_path_suffix), mode=0777)
+
     try:
         file_object = open(file_path, 'w')
         json.dump(product_list, file_object, indent=4)
@@ -79,17 +96,19 @@ def get_categories(file_path):
     f = open(file_path, "r")
     lines = f.readlines()
     f.close()
-    categories = []
+    categories = {}
     for line in lines:
         line = line.replace('\n', '')
-        categories.append(line)
+        type, path = line.split(':')
+        categories[type] = path
+        # categories.append(line)
     return categories
 
 
 def scrape_all():
     categories = get_categories("cat.lst")
-    for category in categories:
-        scrape_category(category)
+    for category in categories.keys():
+        scrape_category(category, categories[category])
 
 
 if __name__ == "__main__":
