@@ -1,0 +1,8 @@
+elasticsearch>=7.0.5
+parsel>=1.5.2      
+pycparser>=2.19       
+configparser>=3.7.4
+Twisted>=19.7.0     
+urllib3>=1.25.3     
+setuptools>=41.1.0     
+
