@@ -1,2 +1,6 @@
 output/
+log/
 venv3/
+.idea/
+.vscode/
+
