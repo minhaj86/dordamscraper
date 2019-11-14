@@ -17,6 +17,7 @@ docker network create dordam
 Elasticsearch
 docker run -d --name elasticsearch  -h eshost --net=dordam   -e "discovery.type=single-node" elasticsearch:7.4.1
 
+For windows: Run=> route /P add 172.18.0.2 MASK 255.0.0.0 10.0.75.2
 
 Elasticsearch Admin Tool (Web)
 docker run -p 5000:5000 --net=dordam elastichq/elasticsearch-hq
